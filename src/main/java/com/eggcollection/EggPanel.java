@@ -59,6 +59,7 @@ class EggPanel extends PluginPanel
     private String revealedName;
     private long revealStarted;
     private final Runnable readySound;
+    private Runnable stopReadySound=() -> {};
     private final EggReadyAudio jerryAudio;
     private Consumer<Boolean> onJerryPack=enabled -> {};
     private boolean readyToHatch;
@@ -71,9 +72,10 @@ class EggPanel extends PluginPanel
         else repaint();
     });
 
-    @Inject EggPanel()
+    @Inject EggPanel(EggReadySound readySound,EggSpinSound spinSound,EggJerrySoundPack jerrySound)
     {
-        this(EggReadySound::play,System::nanoTime,new EggSpinSound(),new EggJerrySoundPack(),EggDevelopment.enabled());
+        this(readySound::play,System::nanoTime,spinSound,jerrySound,EggDevelopment.enabled());
+        stopReadySound=readySound::stop;
     }
 
     EggPanel(Runnable readySound)
@@ -262,7 +264,7 @@ class EggPanel extends PluginPanel
         resetButton.setEnabled(developerTools && game != null);
         if (game == null || (game.activePet == null && !game.awaitingSpin))
         {
-            jerryAudio.stop();
+            stopReadySound.run();jerryAudio.stop();
             revealTimer.stop(); revealedPet = null; hatchPending = false; choosingEgg = false;
             roulette.cancel();
         }

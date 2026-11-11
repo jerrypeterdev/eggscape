@@ -1,22 +1,23 @@
 package com.eggcollection;
 
 import java.io.IOException;
-import java.net.URL;
-import javax.sound.sampled.*;
+import java.util.concurrent.ScheduledExecutorService;
+import javax.inject.Inject;
+import net.runelite.client.audio.AudioPlayer;
 
-/** The supplied MP3, decoded once to a packaged PCM WAV for standard Java playback. */
+/** The supplied wheel recording, kept in sync when returning to the sidebar. */
 final class EggSpinSound implements EggSpinAudio
 {
-    private static final URL RESOURCE=EggSpinSound.class.getResource("sounds/wheel-spin.wav");
     static final long DURATION_NANOS=duration();
-    private final EggPcmSound player=new EggPcmSound();
+    private final EggPcmSound player;
+
+    @Inject EggSpinSound(AudioPlayer audio,ScheduledExecutorService executor)
+    {player=new EggPcmSound(audio,executor);}
 
     private static long duration()
     {
-        try(AudioInputStream input=AudioSystem.getAudioInputStream(RESOURCE))
-        {return Math.round(input.getFrameLength()*1_000_000_000.0/input.getFormat().getFrameRate());}
-        catch(UnsupportedAudioFileException | IOException ex)
-        {throw new ExceptionInInitializerError(ex);}
+        try{return EggWave.load("sounds/wheel-spin.wav").durationNanos();}
+        catch(IOException ex){throw new ExceptionInInitializerError(ex);}
     }
 
     @Override public void play(long offsetNanos){player.play("sounds/wheel-spin.wav",offsetNanos);}

@@ -1,12 +1,18 @@
 package com.eggcollection;
 
-/** Default hatch-ready cue supplied by the user, played off the UI/client threads. */
+import java.util.concurrent.ScheduledExecutorService;
+import javax.inject.Inject;
+import net.runelite.client.audio.AudioPlayer;
+
+/** Default hatch-ready cue supplied by the user. */
 final class EggReadySound
 {
     static final String RESOURCE="sounds/ready-horn.wav";
-    private static final EggPcmSound PLAYER=new EggPcmSound();
+    private final EggPcmSound player;
 
-    private EggReadySound() {}
+    @Inject EggReadySound(AudioPlayer audio,ScheduledExecutorService executor)
+    {player=new EggPcmSound(audio,executor);}
 
-    static void play(){PLAYER.play(RESOURCE,0);}
+    void play(){player.play(RESOURCE,0);}
+    void stop(){player.stop();}
 }

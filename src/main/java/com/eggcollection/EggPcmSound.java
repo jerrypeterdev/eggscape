@@ -1,53 +1,65 @@
 package com.eggcollection;
 
-import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.io.ByteArrayInputStream;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.sound.sampled.*;
+import net.runelite.client.audio.AudioPlayer;
 import org.slf4j.LoggerFactory;
 
-/** All audio-device work stays off the game/UI threads, with one live clip per player. */
+/** RuneLite owns the audio device; short segments keep mute and seek responsive. */
 final class EggPcmSound
 {
-    private static final ExecutorService AUDIO=Executors.newSingleThreadExecutor(task -> {
-        Thread thread=new Thread(task,"egg-collection-recordings");thread.setDaemon(true);return thread;
-    });
+    private static final Map<String,EggWave> WAVES=new ConcurrentHashMap<>();
+    private final AudioPlayer audio;
+    private final ScheduledExecutorService executor;
     private final AtomicLong generation=new AtomicLong();
-    private Clip clip;
+    private ScheduledFuture<?> pending;
 
-    void play(String resource,long offsetNanos)
+    EggPcmSound(AudioPlayer audio,ScheduledExecutorService executor)
+    {this.audio=audio;this.executor=executor;}
+
+    synchronized void play(String resource,long offsetNanos)
     {
-        long request=generation.incrementAndGet();
-        AUDIO.execute(() -> {
-            if(request!=generation.get())return;
-            closeClip();
-            try(AudioInputStream input=AudioSystem.getAudioInputStream(EggPcmSound.class.getResource(resource)))
+        stop();long request=generation.get();
+        pending=executor.schedule(() -> {
+            try
             {
-                Clip opened=AudioSystem.getClip();
-                try
-                {
-                    opened.open(input);
-                    if(request!=generation.get()){opened.close();return;}
-                    opened.setMicrosecondPosition(Math.max(0,Math.min(opened.getMicrosecondLength(),offsetNanos/1000)));
-                    opened.addLineListener(event -> {
-                        if(event.getType()==LineEvent.Type.STOP)
-                            AUDIO.execute(() -> {if(clip==opened)closeClip();});
-                    });
-                    clip=opened;opened.start();
-                }
-                catch(LineUnavailableException | IOException | RuntimeException ex){opened.close();throw ex;}
+                EggWave wave=WAVES.get(resource);
+                if(wave==null){wave=EggWave.load(resource);WAVES.put(resource,wave);}
+                playSegment(request,wave,wave.frameAt(offsetNanos));
             }
-            catch(UnsupportedAudioFileException | IOException | LineUnavailableException | IllegalArgumentException | SecurityException ex)
-            {LoggerFactory.getLogger(EggPcmSound.class).debug("Egg Collection sound unavailable",ex);}
-        });
+            catch(Exception ex){unavailable(ex);}
+        },0,TimeUnit.NANOSECONDS);
     }
 
-    void stop(){generation.incrementAndGet();AUDIO.execute(this::closeClip);}
-
-    private void closeClip()
+    private void playSegment(long request,EggWave wave,long first)
     {
-        Clip closing=clip;clip=null;
-        if(closing!=null){closing.stop();closing.close();}
+        if(request!=generation.get() || first>=wave.frames())return;
+        long count=Math.min(wave.segmentFrames(),wave.frames()-first);
+        try
+        {
+            byte[] segment=wave.slice(first,count);
+            if(request!=generation.get())return;
+            audio.play(new ByteArrayInputStream(segment),0);
+            synchronized(this)
+            {
+                if(request==generation.get() && first+count<wave.frames())
+                    pending=executor.schedule(() -> playSegment(request,wave,first+count),wave.nanosFor(count),TimeUnit.NANOSECONDS);
+            }
+        }
+        catch(Exception ex){unavailable(ex);}
     }
+
+    synchronized void stop()
+    {
+        generation.incrementAndGet();
+        if(pending!=null){pending.cancel(false);pending=null;}
+    }
+
+    private static void unavailable(Exception ex)
+    {LoggerFactory.getLogger(EggPcmSound.class).debug("EggScape sound unavailable",ex);}
 }

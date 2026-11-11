@@ -1,6 +1,9 @@
 package com.eggcollection;
 
 import java.util.Random;
+import java.util.concurrent.ScheduledExecutorService;
+import javax.inject.Inject;
+import net.runelite.client.audio.AudioPlayer;
 import java.util.function.Consumer;
 
 /** One uniformly chosen recording per ready event; a new recording replaces the old one. */
@@ -12,7 +15,8 @@ final class EggJerrySoundPack implements EggReadyAudio
     private final Consumer<String> play;
     private final Runnable stop;
 
-    EggJerrySoundPack(){this(new Random(),new EggPcmSound());}
+    @Inject EggJerrySoundPack(AudioPlayer audio,ScheduledExecutorService executor)
+    {this(new Random(),new EggPcmSound(audio,executor));}
     private EggJerrySoundPack(Random random,EggPcmSound player)
     {this(random,path -> player.play(path,0),player::stop);}
 
