@@ -54,7 +54,7 @@ public class EggPlugin extends Plugin
     @Inject private EggPanel panel;
     @Inject private ClientThread clientThread;
     @Inject private ItemManager itemManager;
-    private final Gson gson = new Gson();
+    @Inject private Gson gson;
     private final EggXpTracker xpTracker = new EggXpTracker();
     private final EggActivityTracker activity = new EggActivityTracker();
     private final EggQuestTracker quests = new EggQuestTracker();
