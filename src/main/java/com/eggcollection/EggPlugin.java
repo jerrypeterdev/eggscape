@@ -43,7 +43,7 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 
-@PluginDescriptor(name = "EggScape – Pet Collection", description = "Collect boss pets through gameplay")
+@PluginDescriptor(name = "EggScape – Pet Collection", description = "Play RuneScape. Hatch eggs. Collect tiny bosses.")
 
 public class EggPlugin extends Plugin
 {
